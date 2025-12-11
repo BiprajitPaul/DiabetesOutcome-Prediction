@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Diabetes Prediction (MLAR)</title>
+
+  <!-- Google font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <!-- app styles -->
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="page">
+    <header class="page__header">
+      <h1 class="title">Diabetes Prediction</h1>
+      <p class="subtitle">Enter patient data and click Predict — MLAR model returns probability and label.</p>
+    </header>
+
+    <section class="card">
+      <!-- Form column -->
+      <form id="predictForm" class="form" autocomplete="off" novalidate>
+        <div class="form-grid">
+          <div class="field">
+            <label for="Pregnancies">Pregnancies</label>
+            <input id="Pregnancies" name="Pregnancies" type="number" inputmode="numeric" min="0" step="1" value="0" required>
+          </div>
+
+          <div class="field">
+            <label for="Glucose">Glucose</label>
+            <input id="Glucose" name="Glucose" type="number" inputmode="numeric" min="0" step="any" value="120" required>
+          </div>
+
+          <div class="field">
+            <label for="BloodPressure">Blood Pressure</label>
+            <input id="BloodPressure" name="BloodPressure" type="number" inputmode="numeric" min="0" step="any" value="70" required>
+          </div>
+
+          <div class="field">
+            <label for="SkinThickness">Skin Thickness</label>
+            <input id="SkinThickness" name="SkinThickness" type="number" inputmode="numeric" min="0" step="any" value="20" required>
+          </div>
+
+          <div class="field">
+            <label for="Insulin">Insulin</label>
+            <input id="Insulin" name="Insulin" type="number" inputmode="numeric" min="0" step="any" value="80" required>
+          </div>
+
+          <div class="field">
+            <label for="BMI">BMI</label>
+            <input id="BMI" name="BMI" type="number" inputmode="decimal" min="0.1" step="0.1" value="25.0" required>
+          </div>
+
+          <div class="field">
+            <label for="DiabetesPedigreeFunction">Diabetes Pedigree</label>
+            <input id="DiabetesPedigreeFunction" name="DiabetesPedigreeFunction" type="number" inputmode="decimal" min="0" step="any" value="0.5" required>
+          </div>
+
+          <div class="field">
+            <label for="Age">Age</label>
+            <input id="Age" name="Age" type="number" inputmode="numeric" min="0" step="1" value="30" required>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button id="btn" type="submit" class="btn">Predict</button>
+          <div id="loading" class="loading hidden"><span class="spinner" aria-hidden="true"></span>Predicting…</div>
+        </div>
+
+        <div id="formMsg" class="form-msg" role="status" aria-live="polite"></div>
+      </form>
+
+      <!-- Result column -->
+      <aside id="resultCard" class="result">
+        <div class="result__title">Result</div>
+
+        <div class="result__content">
+          <div class="result-row">
+            <div class="result-label">Prediction</div>
+            <div id="predLabel" class="result-value">—</div>
+          </div>
+
+          <div class="result-row">
+            <div class="result-label">Probability</div>
+            <div id="predProb" class="result-value">—</div>
+          </div>
+
+          <div id="explainBox" class="explain small muted">Tip: risk probability helps interpret the decision. Use clinically.</div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+<script>
+/* Client logic (keeps same behaviour you used) */
+const form = document.getElementById('predictForm');
+const btn = document.getElementById('btn');
+const loading = document.getElementById('loading');
+const formMsg = document.getElementById('formMsg');
+const predLabel = document.getElementById('predLabel');
+const predProb = document.getElementById('predProb');
+const resultCard = document.getElementById('resultCard');
+
+function showLoading(yes){
+  if(yes){
+    loading.classList.remove('hidden');
+    btn.disabled = true;
+    formMsg.textContent = '';
+  } else {
+    loading.classList.add('hidden');
+    btn.disabled = false;
+  }
+}
+
+function formatProb(p){
+  const num = Number(p);
+  return Number.isFinite(num) ? (num*100).toFixed(2)+"%" : "N/A";
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  showLoading(true);
+
+  // gather inputs
+  const fd = new FormData(form);
+  const body = {};
+  for (const [k,v] of fd.entries()){
+    // ensure correct conversion: empty -> null (pydantic will catch missing)
+    body[k] = v === "" ? null : Number(v);
+  }
+
+  try {
+    const res = await fetch('/predict', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok){
+      const err = await res.json().catch(()=>({detail:res.statusText}));
+      throw new Error(err.detail || res.statusText || 'Request failed');
+    }
+
+    const json = await res.json();
+    const label = json.prediction === 1 ? 'Diabetic' : 'Not diabetic';
+    predLabel.textContent = label;
+    predLabel.className = json.prediction === 1 ? 'result-value danger' : 'result-value success';
+    predProb.textContent = formatProb(json.probability);
+  } catch (err){
+    formMsg.textContent = "Error: " + err.message;
+    formMsg.classList.add('error');
+    predLabel.textContent = '—';
+    predProb.textContent = '—';
+  } finally {
+    showLoading(false);
+  }
+});
+</script>
+</body>
+</html>
