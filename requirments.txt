@@ -2,3 +2,6 @@ pandas
 matplotlib
 scikit-learn
 seaborn
+fastapi
+uvicorn
+joblit
